@@ -1,11 +1,52 @@
-body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8fafc;color:#0f172a}
-.container{max-width:1100px;margin:28px auto;padding:0 16px}
-h1{font-size:28px;margin:6px 0 10px;text-align:center}
-.controls{display:flex;align-items:center;gap:10px;justify-content:center;margin:10px 0 6px}
-#map{margin-top:8px;display:flex;justify-content:center}
-svg{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-#legend{display:flex;justify-content:center;margin-top:8px}
-.tooltip{position:absolute;background:#fff;border:1px solid #cbd5e1;padding:6px 8px;border-radius:6px;
-         box-shadow:0 2px 6px rgba(0,0,0,.08);font-size:12px;pointer-events:none}
-.note{color:#475569;font-size:12px;margin-top:8px;text-align:center}
-.resort{stroke:#111;stroke-width:0.6px;fill:#fffb;backdrop-filter:blur(2px)}
+body {
+  font-family: "Inter", sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-top: 1rem;
+}
+
+#map {
+  position: relative;
+  width: fit-content;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+svg, canvas {
+  display: block;
+}
+
+#controls {
+  margin: 0.5rem auto 1rem;
+  font-size: 1rem;
+}
+
+input[type="range"] {
+  width: 240px;
+  accent-color: #2563eb;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(30,41,59,0.9);
+  color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+#legend {
+  margin-top: 1rem;
+}
