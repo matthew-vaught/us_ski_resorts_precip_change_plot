@@ -50,3 +50,7 @@ input[type="range"] {
 #legend {
   margin-top: 1rem;
 }
+
+canvas {
+  filter: blur(1.5px);
+}

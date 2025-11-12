@@ -25,9 +25,9 @@ const tooltip = d3.select("body").append("div")
   .attr("class", "tooltip")
   .style("opacity", 0);
 
-// Diverging colors around 0% (brown=drier, green=wetter)
-const color = d3.scaleDiverging(d3.interpolateBrBG)
-  .domain([50, 0, -50]) // 50% wetter -> green, -50% drier -> brown
+// Diverging red–blue color scale (blue = wetter, red = drier)
+const color = d3.scaleDiverging(d3.interpolateRdBu)
+  .domain([-40, 0, 40]) // -40% = wetter (blue), +40% = drier (red)
   .clamp(true);
 
 // Year slider elements
@@ -114,13 +114,18 @@ Promise.all([
   function draw(year) {
     ctx.clearRect(0, 0, W, H);
     const arr = byYear.get(year) || [];
-    const r = 2.0;
+
+    // Draw larger “pixels” and add smoothing for a more continuous heatmap look
+    ctx.globalAlpha = 0.9;
+    const r = 4.5; // increase from 2.0 to 4–5 for smoother coverage
+
     for (const d of arr) {
-      const p = proj([+d.lon, +d.lat]);
-      if (!p) continue;
-      ctx.fillStyle = color(+d.pct_change);
-      ctx.fillRect(p[0] - r/2, p[1] - r/2, r, r);
+        const p = proj([+d.lon, +d.lat]);
+        if (!p) continue;
+        ctx.fillStyle = color(+d.pct_change);
+        ctx.fillRect(p[0] - r / 2, p[1] - r / 2, r, r);
     }
+    ctx.globalAlpha = 1.0;
   }
 
   // Legend
@@ -133,17 +138,46 @@ Promise.all([
 // ---------- Legend ----------
 function drawLegend() {
   const w = 340, h = 46;
-  const svgL = d3.select("#legend").append("svg").attr("width", w).attr("height", h);
-  const grad = svgL.append("defs").append("linearGradient")
-    .attr("id", "grad").attr("x1", "0%").attr("x2", "100%");
-  const stops = d3.range(0, 1.001, 0.05).map(t => ({t, c: d3.interpolateBrBG(1 - t)})); // flipped
-  grad.selectAll("stop").data(stops).join("stop")
+
+  const svgL = d3.select("#legend")
+    .append("svg")
+    .attr("width", w)
+    .attr("height", h);
+
+  // Red–blue gradient (blue = wetter, red = drier)
+  const grad = svgL.append("defs")
+    .append("linearGradient")
+    .attr("id", "grad")
+    .attr("x1", "0%")
+    .attr("x2", "100%");
+
+  const stops = d3.range(0, 1.001, 0.05).map(t => ({
+    t,
+    c: d3.interpolateRdBu(t)  // standard direction (blue on left, red on right)
+  }));
+
+  grad.selectAll("stop")
+    .data(stops)
+    .join("stop")
     .attr("offset", d => `${d.t * 100}%`)
     .attr("stop-color", d => d.c);
+
   svgL.append("rect")
-    .attr("x", 20).attr("y", 12).attr("width", w - 40).attr("height", 12)
+    .attr("x", 20)
+    .attr("y", 12)
+    .attr("width", w - 40)
+    .attr("height", 12)
     .attr("fill", "url(#grad)");
-  const scale = d3.scaleLinear().domain([-50, 50]).range([20, w - 20]);
-  const axis = d3.axisBottom(scale).ticks(6).tickFormat(d => `${d}%`);
-  svgL.append("g").attr("transform", "translate(0, 24)").call(axis);
+
+  const scale = d3.scaleLinear()
+    .domain([-40, 40]) // -40% wetter (blue), +40% drier (red)
+    .range([20, w - 20]);
+
+  const axis = d3.axisBottom(scale)
+    .ticks(6)
+    .tickFormat(d => `${d}%`);
+
+  svgL.append("g")
+    .attr("transform", "translate(0, 24)")
+    .call(axis);
 }
