@@ -3,23 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>USA Precipitation Change Explorer</title>
+  <title>CMIP6 USA Precipitation Change Heatmap</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson@3"></script>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>CMIP6 USA Precipitation Change (Annual % vs 2000–2020)</h1>
-    <div class="controls">
-      <label for="year">Year:</label>
-      <input type="range" id="year" min="1980" max="2100" value="2085" step="1" />
-      <span id="yearLabel">2085</span>
-    </div>
-    <div id="map"></div>
-    <div id="legend"></div>
-    <p class="note">Values show annual % change in precipitation rate. Baseline = 2000–2020.</p>
+  <h1>CMIP6 USA Precipitation Change (Annual % vs 2000–2020)</h1>
+
+  <div id="controls">
+    <label>Year: <span id="yearLabel">2025</span></label>
+    <input id="yearSlider" type="range" min="2025" max="2100" value="2025" step="1" />
   </div>
+
+  <div id="map"></div>
+
   <script src="script.js"></script>
 </body>
 </html>
