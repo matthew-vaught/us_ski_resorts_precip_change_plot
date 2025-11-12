@@ -1,26 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CMIP6 USA Precipitation Change Heatmap</title>
-  <link rel="stylesheet" href="style.css" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-</head>
-<body>
-  <h1>CMIP6 USA Precipitation Change (Annual % vs 2000–2020)</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CMIP6 USA Precipitation Change Heatmap</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  </head>
+  <body>
+    <h1>CMIP6 USA Precipitation Change (Annual % vs 2000–2020)</h1>
 
-  <div id="controls">
-    <label>Year: <span id="yearLabel">2025</span></label>
-    <input id="yearSlider" type="range" min="2025" max="2100" value="2025" step="1" />
-  </div>
+    <div id="controls">
+      <label>Year: <span id="yearLabel">2025</span></label>
+      <input id="yearSlider" type="range" min="2025" max="2100" value="2025" step="1" />
+    </div>
 
-  <div id="map"></div>
+    <div id="map"></div>
 
-  <script src="script.js"></script>
-</body>
+    <div id="legend">
+      <span>-40%</span>
+      <div id="colorbar"></div>
+      <span>+40%</span>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
 </html>
