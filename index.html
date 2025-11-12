@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USA Precipitation Change Explorer</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson@3"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>CMIP6 USA Precipitation Change (Annual % vs 2000–2020)</h1>
+    <div class="controls">
+      <label for="year">Year:</label>
+      <input type="range" id="year" min="1980" max="2100" value="2085" step="1" />
+      <span id="yearLabel">2085</span>
+    </div>
+    <div id="map"></div>
+    <div id="legend"></div>
+    <p class="note">Values show annual % change in precipitation rate. Baseline = 2000–2020.</p>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
