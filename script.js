@@ -1,48 +1,35 @@
-// USA precipitation change explorer (canvas heatmap + resort markers)
+// USA precipitation change explorer (smooth contour heatmap + resort markers)
 const W = 980, H = 560;
-
 const svg = d3.select("#map").append("svg").attr("width", W).attr("height", H);
 const g = svg.append("g");
 
-// Albers USA projection (good for CONUS)
+// Albers projection centered for CONUS
 const proj = d3.geoAlbersUsa()
-  .translate([W * 0.55, H * 0.5])   // shift center slightly right
-  .scale(W * 1.3);                  // scale relative to canvas width
+  .translate([W * 0.55, H * 0.5])
+  .scale(W * 1.3);
 const path = d3.geoPath(proj);
 
-// Canvas for the heat layer
-const canvas = d3.select("#map").append("canvas")
-  .attr("width", W)
-  .attr("height", H)
-  .style("position", "absolute")
-  .style("left", "0px")
-  .style("top", "0px")
-  .style("pointer-events", "none");
-const ctx = canvas.node().getContext("2d");
+// Red–blue diverging color scale (blue = wetter, red = drier)
+const color = d3.scaleDiverging(d3.interpolateRdBu)
+  .domain([-40, 0, 40])
+  .clamp(true);
 
-// Tooltip
+// Tooltip for resorts
 const tooltip = d3.select("body").append("div")
   .attr("class", "tooltip")
   .style("opacity", 0);
 
-// Diverging red–blue color scale (blue = wetter, red = drier)
-const color = d3.scaleDiverging(d3.interpolateRdBu)
-  .domain([-40, 0, 40]) // -40% = wetter (blue), +40% = drier (red)
-  .clamp(true);
-
-// Year slider elements
+// Year slider
 const yearInput = document.getElementById("year");
 const yearLabel = document.getElementById("yearLabel");
 yearInput.addEventListener("input", () => {
   yearLabel.textContent = yearInput.value;
-  draw(+yearInput.value);
+  update(+yearInput.value);
 });
 
 // ---------- Load data ----------
 Promise.all([
   d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"),
-
-  // Convert numeric fields properly
   d3.csv("data/us_pr_change_by_year.csv").then(raw =>
     raw.map(d => ({
       year: +d.year,
@@ -51,31 +38,28 @@ Promise.all([
       pct_change: +d.pct_change
     }))
   ),
-
-  // Resort data: name, state, lat, lon
   d3.csv("data/resorts.csv", d3.autoType)
 ]).then(([us, grid, resorts]) => {
   const states = topojson.feature(us, us.objects.states);
+  g.selectAll("path").data(states.features)
+    .join("path")
+    .attr("d", path)
+    .attr("fill", "#f8fafc")
+    .attr("stroke", "#94a3b8")
+    .attr("stroke-width", 0.6);
 
   // Slider bounds from data
   const years = d3.extent(grid, d => d.year);
   yearInput.min = years[0];
   yearInput.max = years[1];
   yearInput.step = 1;
-  yearInput.value = Math.min(2085, years[1]);
+  yearInput.value = 2025;
   yearLabel.textContent = yearInput.value;
 
-  // Draw state boundaries
-  g.selectAll("path").data(states.features).join("path")
-    .attr("d", path)
-    .attr("fill", "#f8fafc")
-    .attr("stroke", "#94a3b8")
-    .attr("stroke-width", 0.6);
-
-  // Group grid by year for fast redraws
+  // Group data by year
   const byYear = d3.group(grid, d => d.year);
 
-  // Resort markers (SVG)
+  // Resort markers
   g.selectAll(".resort").data(resorts).join("circle")
     .attr("class", "resort")
     .attr("r", 3.3)
@@ -90,94 +74,71 @@ Promise.all([
       tooltip.style("opacity", 1)
         .style("left", (event.pageX + 10) + "px")
         .style("top", (event.pageY - 20) + "px")
-        .html(`<strong>${d.name}</strong> (${d.state})<br/><span id="val">loading…</span>`);
-
-      const yr = +yearInput.value;
-      const arr = byYear.get(yr) || [];
-      const p = proj([+d.lon, +d.lat]);
-      if (p && arr.length) {
-        let best = null, bestD = Infinity;
-        for (const row of arr) {
-          const q = proj([+row.lon, +row.lat]);
-          if (!q) continue;
-          const dd = (q[0]-p[0])**2 + (q[1]-p[1])**2;
-          if (dd < bestD) { bestD = dd; best = row; }
-        }
-        tooltip.select("#val").text(best ? `${d3.format(".1f")(best.pct_change)}%` : "n/a");
-      } else {
-        tooltip.select("#val").text("n/a");
-      }
+        .html(`<strong>${d.name}</strong> (${d.state})`);
     })
     .on("mouseout", () => tooltip.style("opacity", 0));
 
-  // Draw the precipitation heatmap for a given year
-  function draw(year) {
-    ctx.clearRect(0, 0, W, H);
-    const arr = byYear.get(year) || [];
+  // Contour layer group
+  const contourLayer = g.append("g").attr("class", "contourLayer");
 
-    // Draw larger “pixels” and add smoothing for a more continuous heatmap look
-    ctx.globalAlpha = 0.9;
-    const r = 4.5; // increase from 2.0 to 4–5 for smoother coverage
+  // Function to draw/update heatmap
+  function update(year) {
+    const arr = byYear.get(year);
+    if (!arr) return;
 
-    for (const d of arr) {
-        const p = proj([+d.lon, +d.lat]);
-        if (!p) continue;
-        ctx.fillStyle = color(+d.pct_change);
-        ctx.fillRect(p[0] - r / 2, p[1] - r / 2, r, r);
-    }
-    ctx.globalAlpha = 1.0;
+    // Project to pixel coords
+    const points = arr.map(d => {
+      const p = proj([d.lon, d.lat]);
+      return p ? [p[0], p[1], d.pct_change] : null;
+    }).filter(Boolean);
+
+    // Build smooth contours
+    const contours = d3.contourDensity()
+      .x(d => d[0])
+      .y(d => d[1])
+      .weight(d => Math.abs(d[2]) + 0.01)
+      .size([W, H])
+      .bandwidth(35)   // higher = smoother
+      (points);
+
+    const maxChange = d3.max(points, d => Math.abs(d[2])) || 40;
+
+    // Animate between frames with morph
+    const paths = contourLayer.selectAll("path")
+      .data(contours, d => d.value);
+
+    paths.join(
+      enter => enter.append("path")
+        .attr("d", d3.geoPath())
+        .attr("fill", d => color(d.value * 40 / maxChange))
+        .attr("opacity", 0)
+        .transition().duration(800)
+        .attr("opacity", 0.9),
+      update => update.transition().duration(800)
+        .attr("d", d3.geoPath())
+        .attr("fill", d => color(d.value * 40 / maxChange)),
+      exit => exit.transition().duration(500)
+        .attr("opacity", 0)
+        .remove()
+    );
   }
 
-  // Legend
   drawLegend();
-
-  // Initial draw
-  draw(+yearInput.value);
+  update(+yearInput.value);
 });
 
 // ---------- Legend ----------
 function drawLegend() {
   const w = 340, h = 46;
-
-  const svgL = d3.select("#legend")
-    .append("svg")
-    .attr("width", w)
-    .attr("height", h);
-
-  // Red–blue gradient (blue = wetter, red = drier)
-  const grad = svgL.append("defs")
-    .append("linearGradient")
-    .attr("id", "grad")
-    .attr("x1", "0%")
-    .attr("x2", "100%");
-
-  const stops = d3.range(0, 1.001, 0.05).map(t => ({
-    t,
-    c: d3.interpolateRdBu(t)  // standard direction (blue on left, red on right)
-  }));
-
-  grad.selectAll("stop")
-    .data(stops)
-    .join("stop")
-    .attr("offset", d => `${d.t * 100}%`)
-    .attr("stop-color", d => d.c);
-
-  svgL.append("rect")
-    .attr("x", 20)
-    .attr("y", 12)
-    .attr("width", w - 40)
-    .attr("height", 12)
-    .attr("fill", "url(#grad)");
-
-  const scale = d3.scaleLinear()
-    .domain([-40, 40]) // -40% wetter (blue), +40% drier (red)
-    .range([20, w - 20]);
-
-  const axis = d3.axisBottom(scale)
-    .ticks(6)
-    .tickFormat(d => `${d}%`);
-
-  svgL.append("g")
-    .attr("transform", "translate(0, 24)")
-    .call(axis);
+  const svgL = d3.select("#legend").append("svg").attr("width", w).attr("height", h);
+  const grad = svgL.append("defs").append("linearGradient")
+    .attr("id", "grad").attr("x1", "0%").attr("x2", "100%");
+  const stops = d3.range(0, 1.001, 0.05).map(t => ({ t, c: d3.interpolateRdBu(t) }));
+  grad.selectAll("stop").data(stops).join("stop")
+    .attr("offset", d => `${d.t * 100}%`).attr("stop-color", d => d.c);
+  svgL.append("rect").attr("x", 20).attr("y", 12)
+    .attr("width", w - 40).attr("height", 12).attr("fill", "url(#grad)");
+  const scale = d3.scaleLinear().domain([-40, 40]).range([20, w - 20]);
+  const axis = d3.axisBottom(scale).ticks(6).tickFormat(d => `${d}%`);
+  svgL.append("g").attr("transform", `translate(0, 24)`).call(axis);
 }
