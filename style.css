@@ -54,3 +54,10 @@ input[type="range"] {
 canvas {
   filter: blur(1.5px);
 }
+
+.heatLayer path {
+  stroke: none;
+}
+.resort {
+  pointer-events: all;
+}

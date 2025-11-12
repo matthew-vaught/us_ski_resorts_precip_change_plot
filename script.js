@@ -1,20 +1,18 @@
-// USA precipitation change explorer (smooth contour heatmap + resort markers)
+// USA precipitation change explorer (gridded heatmap + resort markers)
 const W = 980, H = 560;
 const svg = d3.select("#map").append("svg").attr("width", W).attr("height", H);
 const g = svg.append("g");
 
-// Albers projection centered for CONUS
+// Projection
 const proj = d3.geoAlbersUsa()
   .translate([W * 0.55, H * 0.5])
   .scale(W * 1.3);
 const path = d3.geoPath(proj);
 
-// Red–blue diverging color scale (blue = wetter, red = drier)
-const color = d3.scaleDiverging(d3.interpolateRdBu)
-  .domain([-40, 0, 40])
-  .clamp(true);
+// Diverging red–blue color scale
+const color = d3.scaleDiverging(d3.interpolateRdBu).domain([-40, 0, 40]).clamp(true);
 
-// Tooltip for resorts
+// Tooltip
 const tooltip = d3.select("body").append("div")
   .attr("class", "tooltip")
   .style("opacity", 0);
@@ -24,7 +22,7 @@ const yearInput = document.getElementById("year");
 const yearLabel = document.getElementById("yearLabel");
 yearInput.addEventListener("input", () => {
   yearLabel.textContent = yearInput.value;
-  update(+yearInput.value);
+  draw(+yearInput.value);
 });
 
 // ---------- Load data ----------
@@ -41,14 +39,13 @@ Promise.all([
   d3.csv("data/resorts.csv", d3.autoType)
 ]).then(([us, grid, resorts]) => {
   const states = topojson.feature(us, us.objects.states);
-  g.selectAll("path").data(states.features)
-    .join("path")
-    .attr("d", path)
-    .attr("fill", "#f8fafc")
+  g.append("path")
+    .datum(states)
+    .attr("fill", "none")
     .attr("stroke", "#94a3b8")
-    .attr("stroke-width", 0.6);
+    .attr("stroke-width", 0.6)
+    .attr("d", path);
 
-  // Slider bounds from data
   const years = d3.extent(grid, d => d.year);
   yearInput.min = years[0];
   yearInput.max = years[1];
@@ -56,8 +53,41 @@ Promise.all([
   yearInput.value = 2025;
   yearLabel.textContent = yearInput.value;
 
-  // Group data by year
+  // Group data by year for fast access
   const byYear = d3.group(grid, d => d.year);
+
+  // Estimate grid cell size (lon/lat resolution)
+  const lonStep = d3.median(d3.pairs(d3.sort(Array.from(new Set(grid.map(d => d.lon))))).map(p => p[1]-p[0]));
+  const latStep = d3.median(d3.pairs(d3.sort(Array.from(new Set(grid.map(d => d.lat))))).map(p => p[1]-p[0]));
+
+  // Group of heatmap tiles
+  const heatLayer = g.append("g").attr("class", "heatLayer");
+
+  function draw(year) {
+    const arr = byYear.get(year);
+    if (!arr) return;
+
+    const rects = heatLayer.selectAll("path").data(arr, d => `${d.lat},${d.lon}`);
+
+    rects.join(
+      enter => enter.append("path")
+        .attr("d", d => {
+          const coords = [
+            [d.lon - lonStep/2, d.lat - latStep/2],
+            [d.lon + lonStep/2, d.lat - latStep/2],
+            [d.lon + lonStep/2, d.lat + latStep/2],
+            [d.lon - lonStep/2, d.lat + latStep/2],
+            [d.lon - lonStep/2, d.lat - latStep/2]
+          ];
+          return path({type: "Polygon", coordinates: [coords]});
+        })
+        .attr("fill", d => color(d.pct_change))
+        .attr("opacity", 0.9),
+      update => update.transition().duration(500)
+        .attr("fill", d => color(d.pct_change)),
+      exit => exit.remove()
+    );
+  }
 
   // Resort markers
   g.selectAll(".resort").data(resorts).join("circle")
@@ -78,53 +108,11 @@ Promise.all([
     })
     .on("mouseout", () => tooltip.style("opacity", 0));
 
-  // Contour layer group
-  const contourLayer = g.append("g").attr("class", "contourLayer");
-
-  // Function to draw/update heatmap
-  function update(year) {
-    const arr = byYear.get(year);
-    if (!arr) return;
-
-    // Project to pixel coords
-    const points = arr.map(d => {
-      const p = proj([d.lon, d.lat]);
-      return p ? [p[0], p[1], d.pct_change] : null;
-    }).filter(Boolean);
-
-    // Build smooth contours
-    const contours = d3.contourDensity()
-      .x(d => d[0])
-      .y(d => d[1])
-      .weight(d => Math.abs(d[2]) + 0.01)
-      .size([W, H])
-      .bandwidth(35)   // higher = smoother
-      (points);
-
-    const maxChange = d3.max(points, d => Math.abs(d[2])) || 40;
-
-    // Animate between frames with morph
-    const paths = contourLayer.selectAll("path")
-      .data(contours, d => d.value);
-
-    paths.join(
-      enter => enter.append("path")
-        .attr("d", d3.geoPath())
-        .attr("fill", d => color(d.value * 40 / maxChange))
-        .attr("opacity", 0)
-        .transition().duration(800)
-        .attr("opacity", 0.9),
-      update => update.transition().duration(800)
-        .attr("d", d3.geoPath())
-        .attr("fill", d => color(d.value * 40 / maxChange)),
-      exit => exit.transition().duration(500)
-        .attr("opacity", 0)
-        .remove()
-    );
-  }
-
+  // Legend
   drawLegend();
-  update(+yearInput.value);
+
+  // Initial draw
+  draw(+yearInput.value);
 });
 
 // ---------- Legend ----------
